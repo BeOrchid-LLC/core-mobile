@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "BeOrchid Core Mobile",
+    "slug": "core-mobile",
+    "scheme": "beorchidcore",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-status-bar"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.beorchid.coremobile"
+    },
+    "android": {
+      "package": "com.beorchid.coremobile"
+    }
+  }
+}
