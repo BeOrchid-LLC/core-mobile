@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@beorchid/core-sdk": "file:../beorchid-core-web/packages/core-sdk",
+    "@beorchid/core-sdk": "file:../core-sdk",
     "@clerk/clerk-expo": "^2.20.0",
     "expo": "~57.0.18",
     "expo-constants": "~57.0.16",
