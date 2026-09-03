@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Linking from 'expo-linking';
 import { useSSO, useSignIn } from '@clerk/clerk-expo';
 import type { OAuthStrategy } from '@clerk/types';
 import { Banner, Button, Card, Chip, H1, H2, Muted, P, Row, Screen } from '@/components/ui';
@@ -87,7 +86,7 @@ function ClerkSignIn() {
       // (Section 4.4). Control returns through the beorchidcore scheme.
       const result = await startSSOFlow({
         strategy,
-        redirectUrl: Linking.createURL('/dashboard'),
+        redirectUrl: process.env.EXPO_PUBLIC_CLERK_OAUTH_REDIRECT_URL,
       });
       if (result.createdSessionId && result.setActive) {
         await result.setActive({ session: result.createdSessionId });
