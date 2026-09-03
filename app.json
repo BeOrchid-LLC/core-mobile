@@ -17,6 +17,12 @@
     },
     "android": {
       "package": "com.beorchid.coremobile"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "53a5d783-44f4-46fc-8fc7-8cbd514ce867"
+      }
     }
   }
 }

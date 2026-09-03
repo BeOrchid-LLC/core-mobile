@@ -1,10 +1,33 @@
 # Registering `core_mobile` in Core
 
-**Still not executed against a real database.** The decision that blocked this
-is resolved (below); what remains is running it, which needs a Postgres
-instance this change was not made against. No `.env` exists in `core-api` in
-this environment and no local PostgreSQL is installed, so the steps below are
-written to be run, not run here.
+**Update, 3 September 2026: executed against the live database**, via the
+admin API rather than the local-only scripts below (`db:seed-dev` and
+`db:grant-dev-access` both refuse to run against anything but
+`NODE_ENV=development`, so neither applies to a live environment). The
+commands used were the admin-API equivalents from
+[`../../beorchid-core/docs/add-new-app.md`](../../beorchid-core/docs/add-new-app.md#4-reuse-or-define-roles-and-attach-permissions):
+`POST /v1/admin/apps`, `POST /v1/admin/roles`,
+`POST /v1/admin/roles/:id/permissions`, and
+`POST /v1/admin/memberships/:id/app-roles`. **Not independently re-verified
+here** — confirm with `GET /v1/permissions/resolve?membership_id=...` before
+treating this as settled.
+
+Two real gaps surfaced while doing this, worth recording since they'll hit
+the next person too:
+
+- **Clerk's Organizations feature was disabled on the live instance.**
+  `db:reconcile` ran without error and reported `organizations=0` — which
+  looks exactly like "nothing to sync" rather than "this is misconfigured."
+  It was off, not broken. Enabled 3 September 2026 (Configure →
+  Organizations in the Clerk Dashboard).
+- **A brand-new Clerk user has no organization until one is created and they
+  are added to it.** Enabling the feature doesn't retroactively create one —
+  reconcile only pulls what already exists in Clerk. This was the actual
+  remaining gap after enabling Organizations.
+
+The steps below are kept as the record of what running this against a fresh
+database looks like — via the local scripts, for a `development`-only
+environment. They were not exercised against `development` in this pass.
 
 ## The decision that was blocking this
 
@@ -108,7 +131,7 @@ The remaining three, not re-verified either, from the original writing:
 |---|---|
 | `connect-app.ts` cannot run as the migration role — no `INSERT` on `core.apps`, no `CREATEROLE` | Works locally as superuser only. Will fail in staging. |
 | No sequence grants issued for app schemas | A `bigserial` insert fails with `permission denied for sequence` |
-| `core-api` webhook handler broken — `svix` v2's `verify()` returns `undefined` | Every Clerk event 500s, so identity will not populate from webhooks. Use `npm run db:reconcile` and `npm run db:seed-dev`. |
+| ~~`core-api` webhook handler broken — `svix` v2's `verify()` returns `undefined`~~ | **Appears fixed.** `core-api/src/routes/webhooks/clerk.ts` no longer relies on `verify()`'s return value at all — a comment there explains why (`verify()` throws on a bad signature, which is the only thing relied on; the body is parsed separately). The webhook endpoint is also confirmed live and responding correctly (401 on an unsigned request, not a crash). Not exhaustively re-tested against a real signed event, but the specific defect described here no longer matches the code. |
 
 Confirm each against the current `core-api` before treating it as still true.
 

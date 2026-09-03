@@ -6,14 +6,31 @@ permission set here than in `core-web` (§3.1, §6.4, §16).
 
 ## Running it
 
-From the repository root:
+`core-mobile` is its own repository, not a directory inside a larger one — it
+depends on `@beorchid/core-sdk` via `file:../core-sdk`, so a sibling checkout
+of [`core-sdk`](https://github.com/BeOrchid-LLC/core-sdk) needs to exist
+alongside it on disk, built before `core-mobile` can resolve it (it consumes
+the SDK's `dist/`, not its source):
 
 ```bash
-npm run build:sdk        # core-mobile consumes core-sdk's dist, not its source
-cd core-mobile
-npm install
+cd ../core-sdk && npm install && npm run build
+cd ../core-mobile && npm install
 npm start                # then press a for Android, or scan with Expo Go
 ```
+
+**This sibling-clone pattern has a real gap, not just a local-dev quirk: it
+does not survive a cloud build.** EAS Build (or any CI that clones only this
+repository) never sees a `../core-sdk` directory, so `npm install` fails
+there. `beorchid-core-web` hit the identical problem and fixed it by vendoring
+the SDK in as a git submodule instead of a sibling clone — see
+[`../beorchid-core-web`](https://github.com/BeOrchid-LLC/beorchid-core-web)'s
+`packages/core-sdk` and
+[`add-new-app.md`](../beorchid-core/docs/add-new-app.md#7-install-the-core-sdk)
+for that pattern. `core-mobile` has not been migrated to it yet — Expo's
+per-SDK-version dependency pinning fights the workspace-hoisting that pattern
+relies on, so it needs more care here than a direct copy. Until this is
+resolved, an EAS cloud build should be expected to fail at install unless
+this is fixed first.
 
 It runs today with no Clerk instance and no Core API, using development
 stand-ins for both. Sign in with any Clerk user id; the fixture recognises
@@ -69,7 +86,7 @@ which a release build should be handing out permissions.
 The home screen reports which side each seam is on, so the state is never a
 guess.
 
-## How mobile authenticates to Core API — open
+## How mobile authenticates to Core API — resolved
 
 `core-web` holds `CORE_API_KEY` server-side, where the browser never sees it. A
 mobile app has no server side: anything shipped in the bundle is extractable by
@@ -81,10 +98,14 @@ path that reads one — setting it in `.env` cannot silently ship it. Setting
 fixture, so nobody concludes they are running against a real Core API when they
 are not.
 
-This needs a written client decision before it is implemented. The options, in
-order of preference: a thin backend-for-frontend; Core API accepting a Clerk
-session token directly on a mobile route, verified with `TokenVerifier`; or a
-separate low-privilege mobile key once `/v1/*` is scoped per app.
+**Resolved and built**, of the three options this section used to list in order
+of preference: mobile sends the signed-in user's own Clerk session token
+(`Authorization: Bearer <clerk-jwt>`), which Core API verifies itself with
+`TokenVerifier`. See `docs/registering-core-mobile.md` for the full mechanism —
+`UserTokenCoreClient` here, `core-api/src/middleware/clerk-auth.ts` and
+`core-api/src/routes/mobile.ts` (`GET /mobile/v1/me`, mounted outside the
+shared-secret-gated `/v1/*` tree) on the server side. Deployed and confirmed
+live at `https://api.id.beorchid.ca/mobile/v1/me`.
 
 ## Integrating Clerk
 
@@ -104,6 +125,21 @@ Two things Clerk cannot supply are still needed for production sign-in: a Google
 Cloud OAuth client and a Microsoft Entra ID app registration (§4.2). Configure
 the instance per
 [`../core-api/docs/clerk-configuration.md`](../core-api/docs/clerk-configuration.md).
+
+**A redirect URL has to be allow-listed before sign-in will work at all.**
+`app/sign-in.tsx` calls Clerk with `Linking.createURL('/dashboard')` as the
+redirect target — in Expo Go this resolves to something like
+`exp://<your-LAN-ip>:8081/--/dashboard`, in a real build to
+`beorchidcore:///dashboard`. Either one has to be added under Clerk Dashboard
+→ Configure → **Native applications** (a separate page from the Paths shown
+under Component paths) before sign-in succeeds — Clerk's error names the exact
+URL it rejected if this hasn't been done yet. This is scoped **per Clerk
+instance**: an entry added while the dashboard is switched to one instance
+(e.g. Production) does not apply to another (e.g. Development) — confirm which
+instance `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` actually belongs to (`pk_test_` =
+development, `pk_live_` = production) before assuming an added URL takes
+effect. The Expo Go one also changes with your machine's IP, so expect to
+re-add it on a new network; the build-scheme one is stable once added.
 
 **One difference from `core-web` worth knowing before you test OAuth.** `core-web`
 uses Clerk's hosted `<SignIn />`, which renders whichever strategies the
